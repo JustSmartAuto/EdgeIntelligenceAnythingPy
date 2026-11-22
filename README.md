@@ -1,6 +1,10 @@
 # EdgeIntelligenceAnythingPy
 
-面向边缘智能视觉任务的开源项目合集。当前收录 **ClassifyAnythingPy**：使用合成图像训练 Vision Transformer（ViT），完成自定义图像分类，并支持 Hugging Face Hub 模型管理。
+面向边缘智能视觉任务的开源项目合集，覆盖图像分类、视觉目标定位以及图像与视频分割：
+
+- **ClassifyAnythingPy**：使用合成图像训练 Vision Transformer（ViT），完成自定义图像分类。
+- **LocateAnythingPy**：基于 NVIDIA Eagle 与 LocateAnything，通过自然语言定位目标、文字和 GUI 元素。
+- **SegmentAnythingPy**：基于 Meta SAM 3，通过文本或视觉提示分割图像与视频中的目标并进行跟踪。
 
 ## ClassifyAnythingPy
 
@@ -70,12 +74,90 @@ print(label)
 
 批量推理支持 PNG、JPG、JPEG 和 WebP 图片。首次下载模型或推送到 Hub 时需要网络连接；训练能否使用 GPU 取决于本机 PyTorch 与 CUDA 环境。
 
+## LocateAnythingPy
+
+`LocateAnythingPy/Eagle-main.zip` 收录 NVIDIA Eagle 项目源码，其中 `Embodied` 提供 LocateAnything 模型。目录同时包含论文 `2605.27365v2.pdf` 和 arXiv 源文件。
+
+- **并行边界框解码（PBD）**：将完整边界框或点作为原子单元，在一次前向传播中预测坐标。
+- **通用视觉定位**：支持目标检测、指代表达定位、密集目标检测、OCR 文字定位、GUI 元素定位和点定位。
+- **混合推理**：默认使用快速并行模式，在输出不可靠时回退到自回归模式。
+- **高效适配**：提供 LoRA 视觉提示微调脚本与批量推理运行时。
+
+解压并安装：
+
+```bash
+unzip LocateAnythingPy/Eagle-main.zip
+cd Eagle-main/Embodied
+pip install -e .
+```
+
+基础推理示例：
+
+```python
+from PIL import Image
+from locateanything_worker import LocateAnythingWorker
+
+worker = LocateAnythingWorker("nvidia/LocateAnything-3B")
+image = Image.open("example.jpg").convert("RGB")
+
+print(worker.detect(image, ["person", "car", "bicycle"])["answer"])
+print(worker.ground_multi(image, "people wearing red shirts")["answer"])
+print(worker.detect_text(image)["answer"])
+```
+
+详细安装选项、GPU 运行时、训练和评估方法见压缩包中的 `Embodied/document/lam/README.md`。代码采用 Apache 2.0 许可证，模型权重采用 NVIDIA 模型许可证。
+
+## SegmentAnythingPy
+
+`SegmentAnythingPy/sam3-main.zip` 收录 Meta **SAM 3（Segment Anything with Concepts）**源码；目录同时包含论文 `2511.16719v2.pdf` 和 arXiv 源文件。
+
+- **概念分割**：根据简短文本或图像示例，分割开放词汇概念的全部实例。
+- **多种提示方式**：支持文本、点、边界框和掩码提示。
+- **图像与视频**：统一完成目标检测、实例分割、视频跟踪和交互式修正。
+- **丰富示例**：提供图像、视频、批量推理和评估 Notebook。
+
+SAM 3 要求 Python 3.12+、PyTorch 2.7+、支持 CUDA 的 GPU 和 CUDA 12.6+。安装示例：
+
+```bash
+unzip SegmentAnythingPy/sam3-main.zip
+cd sam3-main
+conda create -n sam3 python=3.12
+conda activate sam3
+pip install torch torchvision --index-url https://download.pytorch.org/whl/cu128
+pip install -e .
+```
+
+下载模型前，需要在 [Hugging Face 模型页面](https://huggingface.co/facebook/sam3)申请访问权限并运行 `hf auth login`。图像文本提示推理示例：
+
+```python
+from PIL import Image
+from sam3.model_builder import build_sam3_image_model
+from sam3.model.sam3_image_processor import Sam3Processor
+
+model = build_sam3_image_model()
+processor = Sam3Processor(model)
+image = Image.open("example.jpg")
+state = processor.set_image(image)
+output = processor.set_text_prompt(state=state, prompt="person")
+masks, boxes, scores = output["masks"], output["boxes"], output["scores"]
+```
+
+SAM 3 使用 SAM License，具体条款见压缩包内的 `LICENSE`。
+
 ## 项目结构
 
 ```text
 EdgeIntelligenceAnythingPy/
 ├── ClassifyAnythingPy/
 │   └── classify-anything-main.zip
+├── LocateAnythingPy/
+│   ├── Eagle-main.zip
+│   ├── 2605.27365v2.pdf
+│   └── arXiv-2605.27365v2.tar.gz
+├── SegmentAnythingPy/
+│   ├── sam3-main.zip
+│   ├── 2511.16719v2.pdf
+│   └── arXiv-2511.16719v2.tar.gz
 ├── index.html
 ├── LICENSE
 └── README.md
